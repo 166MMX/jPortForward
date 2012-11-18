@@ -12,7 +12,7 @@
 * jCommander
 * Logback
     * JCL over SLF4J (to get Spring talk to Logback)
-    * Java mail
+    * JavaMail API
     * Groovy
     * Janino
 
