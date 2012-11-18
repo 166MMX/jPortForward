@@ -6,7 +6,6 @@ import name.harth.jportforward.cli.CommandLineArgs;
 import name.harth.jportforward.cli.ConverterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.support.PropertiesBeanDefinitionReader;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.io.ClassPathResource;
@@ -19,11 +18,6 @@ public class JPortForward {
 
     public static void main(String arguments[])
     {
-        instance = new JPortForward(arguments);
-    }
-
-    private JPortForward(String arguments[])
-    {
         CommandLineArgs cla = new CommandLineArgs();
         JCommander commander = new JCommander(cla);
         commander.addConverterFactory(new ConverterFactory());
@@ -35,6 +29,11 @@ public class JPortForward {
             System.exit(-1);
         }
 
+        instance = new JPortForward();
+    }
+
+    private JPortForward()
+    {
         GenericApplicationContext ctx = new GenericApplicationContext();
         ctx.registerShutdownHook();
         XmlBeanDefinitionReader xmlReader = new XmlBeanDefinitionReader(ctx);
