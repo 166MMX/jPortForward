@@ -13,7 +13,7 @@ public class ConverterFactory implements IStringConverterFactory
 
     static
     {
-        classConverters = new HashMap<>();
+        classConverters = new HashMap<Class<?>, Class<? extends IStringConverter<?>>>();
         classConverters.put(InetSocketAddress.class, InetSocketAddressConverter.class);
     }
 
