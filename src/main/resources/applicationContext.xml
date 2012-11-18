@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean name="server-1" class="name.harth.jportforward.net.Server">
+        <property name="maxConnections" value="0"/>
+        <property name="listeners">
+            <list>
+                <ref bean="listener-1"/>
+            </list>
+        </property>
+        <property name="accessFilter">
+            <list>
+                <ref bean="filter-1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean name="listener-1" class="name.harth.jportforward.net.Listener">
+        <property name="address" value="0.0.0.0"/>
+        <property name="protocol" value="tcp"/>
+        <property name="port" value="56882"/>
+        <property name="maxConnections" value="0"/>
+        <property name="targets">
+            <list>
+                <ref bean="target-1"/>
+            </list>
+        </property>
+        <property name="accessFilter">
+            <list>
+                <ref bean="filter-2"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean name="filter-1" class="name.harth.jportforward.net.AccessFilter">
+        <property name="onMatch" value="ALLOW"/>
+        <property name="onMismatch" value="NEUTRAL"/>
+        <property name="cidr" value="127.0.0.1/16"/>
+        <property name="port" value="56882"/>
+    </bean>
+
+    <bean name="filter-2" class="name.harth.jportforward.net.AccessFilter">
+        <property name="onMatch" value="ALLOW"/>
+        <property name="onMismatch" value="NEUTRAL"/>
+        <property name="cidr" value="127.0.0.1/16"/>
+        <property name="address" value="127.0.0.1"/>
+        <property name="port" value="56882"/>
+    </bean>
+
+    <bean name="target-1" class="name.harth.jportforward.net.Target">
+        <property name="address" value="0.0.0.0"/>
+        <property name="protocol" value="tcp"/>
+        <property name="port" value="56882"/>
+    </bean>
+
+</beans>
