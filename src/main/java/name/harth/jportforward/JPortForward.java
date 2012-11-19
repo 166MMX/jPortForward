@@ -12,7 +12,8 @@ import org.springframework.core.io.ClassPathResource;
 import sun.misc.Signal;
 import sun.misc.SignalHandler;
 
-public class JPortForward {
+public class JPortForward
+{
     private final Logger logger = LoggerFactory.getLogger(JPortForward.class);
     private static JPortForward instance;
 
@@ -22,9 +23,12 @@ public class JPortForward {
         JCommander commander = new JCommander(cla);
         commander.addConverterFactory(new ConverterFactory());
         commander.setProgramName("JPortForward");
-        try {
+        try
+        {
             commander.parse(arguments);
-        } catch (ParameterException ex) {
+        }
+        catch (ParameterException ex)
+        {
             commander.usage();
             System.exit(-1);
         }
@@ -39,6 +43,6 @@ public class JPortForward {
         XmlBeanDefinitionReader xmlReader = new XmlBeanDefinitionReader(ctx);
         xmlReader.loadBeanDefinitions(new ClassPathResource("applicationContext.xml"));
         ctx.refresh();
-
     }
+
 }

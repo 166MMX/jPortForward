@@ -1,31 +1,44 @@
 package name.harth.jportforward.net;
 
-public class Target {
+public class Target
+{
     private String address;
     private String protocol;
-    private int port;
+    private int    port;
 
-    public void setAddress(String address) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setAddress(String address)
+    {
         this.address = address;
     }
 
-    public String getAddress() {
+    @SuppressWarnings("UnusedDeclaration")
+    public String getAddress()
+    {
         return address;
     }
 
-    public void setProtocol(String protocol) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setProtocol(String protocol)
+    {
         this.protocol = protocol;
     }
 
-    public String getProtocol() {
+    @SuppressWarnings("UnusedDeclaration")
+    public String getProtocol()
+    {
         return protocol;
     }
 
-    public int getPort() {
+    @SuppressWarnings("UnusedDeclaration")
+    public int getPort()
+    {
         return port;
     }
 
-    public void setPort(int port) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setPort(int port)
+    {
         this.port = port;
     }
 }

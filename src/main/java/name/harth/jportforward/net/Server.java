@@ -2,32 +2,45 @@ package name.harth.jportforward.net;
 
 import java.util.List;
 
-public class Server {
-    private int maxConnections;
-    private List<Listener> listeners;
+public class Server
+{
+    private int                maxConnections;
+    private List<Listener>     listeners;
     private List<AccessFilter> accessFilter;
 
-    public void setListeners(List<Listener> listeners) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setListeners(List<Listener> listeners)
+    {
         this.listeners = listeners;
     }
 
-    public List<Listener> getListeners() {
+    @SuppressWarnings("UnusedDeclaration")
+    public List<Listener> getListeners()
+    {
         return listeners;
     }
 
-    public void setAccessFilter(List<AccessFilter> accessFilter) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setAccessFilter(List<AccessFilter> accessFilter)
+    {
         this.accessFilter = accessFilter;
     }
 
-    public List<AccessFilter> getAccessFilter() {
+    @SuppressWarnings("UnusedDeclaration")
+    public List<AccessFilter> getAccessFilter()
+    {
         return accessFilter;
     }
 
-    public int getMaxConnections() {
+    @SuppressWarnings("UnusedDeclaration")
+    public int getMaxConnections()
+    {
         return maxConnections;
     }
 
-    public void setMaxConnections(int maxConnections) {
+    @SuppressWarnings("UnusedDeclaration")
+    public void setMaxConnections(int maxConnections)
+    {
         this.maxConnections = maxConnections;
     }
 }

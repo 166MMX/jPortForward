@@ -1,5 +1,7 @@
 package name.harth.jportforward.net;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.Lifecycle;
@@ -7,34 +9,35 @@ import org.springframework.context.Lifecycle;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketPermission;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-public class Listener implements Runnable, Lifecycle, DisposableBean, InitializingBean {
-    private String address;
-    private String protocol;
-    private int port;
-    private int maxConnections;
+public class Listener implements Runnable, Lifecycle, DisposableBean, InitializingBean
+{
+    private String             address;
+    private String             protocol;
+    private int                port;
+    private int                maxConnections;
     private List<AccessFilter> accessFilter;
-    private List<Target> targets;
-    private boolean localThreadRunning;
-    private InetSocketAddress inetSocketAddress;
-    private ServerSocketChannel localChannel;
-    private ServerSocket localSocket;
-    private Selector localSelector;
-    private SelectionKey localSelectionKey;
-    private Thread localThread;
-    private boolean stopLocalThread;
+    private List<Target>       targets;
+
+    private InetSocketAddress   inetSocketAddress;
+    private ServerSocketChannel channel;
+    private ServerSocket        socket;
+    private Selector            selector;
+    private SelectionKey        selectionKey;
+    private Thread              thread;
+    private boolean             stopThread;
+    private boolean             running;
+
+    private final Logger logger = LoggerFactory.getLogger(Listener.class);
 
     public Listener()
     {
-        SecurityManager;
-        localThread = new Thread(this);
+        thread = new Thread(this);
     }
 
     @Override
@@ -46,38 +49,40 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
     @Override
     public void start()
     {
-        stopLocalThread = false;
-        localThread.start();
+        stopThread = false;
+        thread.start();
     }
 
     @Override
     public boolean isRunning()
     {
-        return localThreadRunning;
+        return running;
     }
 
     @Override
     public void stop()
     {
-        stopLocalThread = true;
+        stopThread = true;
     }
 
     private void bindSocket()
     {
         try
         {
-            localChannel = ServerSocketChannel.open();
-            localChannel.configureBlocking(false);
+            channel = ServerSocketChannel.open();
+            channel.configureBlocking(false);
 
-            localSocket = localChannel.socket();
-            localSocket.bind(inetSocketAddress);
+            socket = channel.socket();
+            socket.bind(inetSocketAddress);
 
-            localSelector = Selector.open();
-            localSelectionKey = localChannel.register(localSelector, SelectionKey.OP_ACCEPT);
+            selector = Selector.open();
+            selectionKey = channel.register(selector, SelectionKey.OP_ACCEPT);
         }
         catch (IOException ex)
         {
-
+            if(logger.isErrorEnabled()){
+                logger.error("", ex);
+            }
         }
     }
 
@@ -85,154 +90,158 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
     {
         try
         {
-            localSelectionKey.cancel();
-            localSelector.close();
-            localSocket.close();
-            localChannel.close();
+            selectionKey.cancel();
+            selector.close();
+            socket.close();
+            channel.close();
         }
         catch (IOException ex)
         {
-
+            if(logger.isErrorEnabled()){
+                logger.error("", ex);
+            }
         }
     }
 
     @Override
-    public void destroy() throws Exception {
+    public void destroy() throws Exception
+    {
 
     }
 
     @Override
     public void run()
     {
-        localThreadRunning = true;
+        running = true;
         bindSocket();
         while (true)
         {
             try
             {
-                localSelector.select();
+                long timeout = 1000;
+                selector.select(timeout);
             }
             catch (IOException e)
             {
 
                 break;
             }
-            Set<SelectionKey> readyKeys = localSelector.selectedKeys();
+            Set<SelectionKey> readyKeys = selector.selectedKeys();
             Iterator<SelectionKey> iterator = readyKeys.iterator();
-            while (iterator.hasNext()) {
+            while (iterator.hasNext())
+            {
                 SelectionKey key = iterator.next();
                 iterator.remove();
 
-                if (!key.isValid()) {
+                if (!key.isValid())
+                {
                     continue;
                 }
 
-                if (key.isAcceptable()) {
+                if (key.isAcceptable())
+                {
                     accept(key);
-                } else if (key.isReadable()) {
-                    read(key);
-                } else if (key.isWritable()) {
-                    write(key);
                 }
             }
-            if (stopLocalThread)
+            if (stopThread)
             {
                 break;
             }
         }
         unbindSocket();
-        localThreadRunning = false;
+        running = false;
     }
 
-    private void accept(SelectionKey key) {
-        try {
+    private void accept(SelectionKey key)
+    {
+        try
+        {
             ServerSocketChannel remoteChannel = (ServerSocketChannel) key.channel();
-            SocketChannel remoteChannel = localChannel.accept();
+            SocketChannel remoteChannel = channel.accept();
             ssss.configureBlocking(false);
-            ssss.register(localSelector, SelectionKey.OP_READ);
+            ssss.register(selector, SelectionKey.OP_READ);
 
             Communicator communicator = new Communicator();
             communicator.setRemoteChannel(ssss);
             communicator.start();
-        } catch (IOException ex) {
-
         }
-    }
-
-    private void read(SelectionKey key) {
-        //To change body of created methods use File | Settings | File Templates.
-    }
-
-    private void write(SelectionKey key) {
-        SocketChannel client = (SocketChannel) key.channel();
-        ByteBuffer output = (ByteBuffer) key.attachment();
-        if (!output.hasRemaining()) {
-            output.rewind();
-        }
-        try {
-            client.write(output);
-        } catch (IOException ex) {
-
+        catch (IOException ex)
+        {
+            if(logger.isErrorEnabled()){
+                logger.error("", ex);
+            }
         }
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setAddress(String address) {
+    public void setAddress(String address)
+    {
         this.address = address;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public String getAddress() {
+    public String getAddress()
+    {
         return address;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setProtocol(String protocol) {
+    public void setProtocol(String protocol)
+    {
         this.protocol = protocol;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public String getProtocol() {
+    public String getProtocol()
+    {
         return protocol;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setAccessFilter(List<AccessFilter> accessFilter) {
+    public void setAccessFilter(List<AccessFilter> accessFilter)
+    {
         this.accessFilter = accessFilter;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public List<AccessFilter> getAccessFilter() {
+    public List<AccessFilter> getAccessFilter()
+    {
         return accessFilter;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public int getPort() {
+    public int getPort()
+    {
         return port;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setPort(int port) {
+    public void setPort(int port)
+    {
         this.port = port;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public int getMaxConnections() {
+    public int getMaxConnections()
+    {
         return maxConnections;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setMaxConnections(int maxConnections) {
+    public void setMaxConnections(int maxConnections)
+    {
         this.maxConnections = maxConnections;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setTargets(List<Target> targets) {
+    public void setTargets(List<Target> targets)
+    {
         this.targets = targets;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public List<Target> getTargets() {
+    public List<Target> getTargets()
+    {
         return targets;
     }
 
