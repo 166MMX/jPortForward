@@ -13,33 +13,39 @@ public class InetSocketAddressConverter implements IStringConverter<InetSocketAd
     public InetSocketAddress convert(String address)
     {
         int i = address.indexOf(':');
+
         if (i == -1)
         {
             throw new IllegalArgumentException("No port number in address " + address);
         }
+
         String portStr = address.substring(i + 1);
         int port;
+
         try
         {
             port = Integer.parseInt(portStr);
         }
-        catch (NumberFormatException e)
+        catch (NumberFormatException ex)
         {
-            throw new IllegalArgumentException("Port not a number " + portStr);
+            throw new IllegalArgumentException("Port not a number " + portStr, ex);
         }
+
         if (port < 1 || port > 65535)
         {
             throw new IllegalArgumentException("Port number out of range " + port);
         }
+
         String host = address.substring(0, i);
         InetAddress inetAddress;
+
         try
         {
             inetAddress = InetAddress.getByName(host);
         }
-        catch (UnknownHostException e)
+        catch (UnknownHostException ex)
         {
-            throw new IllegalArgumentException("Unknown host " + host);
+            throw new IllegalArgumentException("Unknown host " + host, ex);
         }
 
         return new InetSocketAddress(inetAddress, port);

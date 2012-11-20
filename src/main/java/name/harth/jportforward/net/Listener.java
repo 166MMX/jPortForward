@@ -13,10 +13,10 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.Vector;
 
 public class Listener implements Runnable, Lifecycle, InitializingBean, DisposableBean
 {
@@ -44,7 +44,7 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
     public Listener()
     {
         thread = new Thread(this);
-        clients = new Vector<Client>();
+        clients = new ArrayList<Client>();
     }
 
     @Override

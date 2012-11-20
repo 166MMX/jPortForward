@@ -9,10 +9,10 @@ public class CommandLineArgs {
 
     //final static Logger logger = LoggerFactory.getLogger(CommandLineArgs.class);
 
-    private static String USER_NAME = System.getProperty("user.name");
-    private static String USER_HOME = System.getProperty("user.home");
-    private static String APP_HOME = USER_HOME + "/.jPortForward";
-    private static String USER_DIR = System.getProperty("user.dir");
+    private static final String USER_NAME = System.getProperty("user.name");
+    private static final String USER_HOME = System.getProperty("user.home");
+    private static final String APP_HOME = USER_HOME + "/.jPortForward";
+    private static final String USER_DIR = System.getProperty("user.dir");
 
 //    @Parameter(names = { "-p", "--protocol" }, description = "protocol to be used")
 //    public String protocol;

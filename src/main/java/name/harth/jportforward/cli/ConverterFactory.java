@@ -5,11 +5,12 @@ import com.beust.jcommander.IStringConverterFactory;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.Map;
 
 public class ConverterFactory implements IStringConverterFactory
 {
 
-    private static HashMap<Class<?>, Class<? extends IStringConverter<?>>> classConverters;
+    private static Map<Class<?>, Class<? extends IStringConverter<?>>> classConverters;
 
     static
     {
