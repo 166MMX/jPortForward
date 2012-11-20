@@ -120,7 +120,7 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
 
         key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-        int bufferSize = 4 * 1024 * 1024; // 4 Megabyte
+        int bufferSize = 1 * 1024 * 1024; // 1 Megabyte
         targetToRemoteBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
         remoteToTargetBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
     }
@@ -130,158 +130,105 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         SocketChannel channel = (SocketChannel) key.channel();
         if (channel == remoteChannel)
         {
-            try
-            {
-                channel.write(targetToRemoteBuffer);
-            }
-            catch (IOException ex)
-            {
-                if (logger.isErrorEnabled())
-                {
-                    logger.error("", ex);
-                }
-            }
-            if (targetToRemoteBuffer.remaining() > 0)
-            {
-                if (logger.isDebugEnabled())
-                {
-                    logger.debug("Remote channel buffer full");
-                }
-            }
+            writeFromBuffer(channel, key, targetToRemoteBuffer);
         }
         else if (channel == targetChannel)
         {
-            try
-            {
-                channel.write(remoteToTargetBuffer);
-            }
-            catch (IOException ex)
-            {
-                if (logger.isErrorEnabled())
-                {
-                    logger.error("", ex);
-                }
-            }
-            if (remoteToTargetBuffer.remaining() > 0)
-            {
-                if (logger.isDebugEnabled())
-                {
-                    logger.debug("Target channel buffer full");
-                }
-            }
+            writeFromBuffer(channel, key, remoteToTargetBuffer);
         }
-        else
+        if (logger.isErrorEnabled())
+        {
+            logger.error("This should not have happened");
+        }
+    }
+
+    private void writeFromBuffer(SocketChannel channel, SelectionKey key, ByteBuffer buffer)
+    {
+        buffer.flip();
+        try
+        {
+            channel.write(buffer);
+        }
+        catch (IOException ex)
         {
             if (logger.isErrorEnabled())
             {
-                logger.error("This should not have happened");
+                logger.error("", ex);
             }
+        }
+        if (buffer.remaining() > 0)
+        {
+            buffer.compact();
+        }
+        else
+        {
+            buffer.clear();
         }
     }
 
     private void read(SelectionKey key)
     {
         SocketChannel channel = (SocketChannel) key.channel();
-        int amount;
         if (channel == remoteChannel)
         {
-            try
-            {
-                amount = channel.read(remoteToTargetBuffer);
-            }
-            catch (IOException ex)
-            {
-                // The remote forcibly closed the connection, cancel
-                // the selection key and close the channel.
-                key.cancel();
-                try
-                {
-                    channel.close();
-                }
-                catch (IOException ex1)
-                {
-                    if (logger.isErrorEnabled())
-                    {
-                        logger.error("", ex1);
-                    }
-                }
-                if (logger.isErrorEnabled())
-                {
-                    logger.error("", ex);
-                }
-                return;
-            }
-
-            if (amount == -1)
-            {
-                // Remote entity shut the socket down cleanly. Do the
-                // same from our end and cancel the channel.
-                key.cancel();
-                try
-                {
-                    channel.close();
-                }
-                catch (IOException ex)
-                {
-                    if (logger.isErrorEnabled())
-                    {
-                        logger.error("", ex);
-                    }
-                }
-                return;
-            }
+            readIntoBuffer(channel, key, remoteToTargetBuffer);
         }
         else if (channel == targetChannel)
         {
-            try
-            {
-                amount = channel.read(targetToRemoteBuffer);
-            }
-            catch (IOException ex)
-            {
-                // The remote forcibly closed the connection, cancel
-                // the selection key and close the channel.
-                key.cancel();
-                try
-                {
-                    channel.close();
-                }
-                catch (IOException ex1)
-                {
-                    if (logger.isErrorEnabled())
-                    {
-                        logger.error("", ex1);
-                    }
-                }
-                if (logger.isErrorEnabled())
-                {
-                    logger.error("", ex);
-                }
-                return;
-            }
-
-            if (amount == -1)
-            {
-                // Remote entity shut the socket down cleanly. Do the
-                // same from our end and cancel the channel.
-                key.cancel();
-                try
-                {
-                    channel.close();
-                }
-                catch (IOException ex)
-                {
-                    if (logger.isErrorEnabled())
-                    {
-                        logger.error("", ex);
-                    }
-                }
-                return;
-            }
+            readIntoBuffer(channel, key, targetToRemoteBuffer);
         }
         if (logger.isErrorEnabled())
         {
             logger.error("This should not have happened");
+        }
+    }
+
+    private void readIntoBuffer(SocketChannel channel, SelectionKey key, ByteBuffer buffer)
+    {
+        int amount;
+        try
+        {
+            amount = channel.read(buffer);
+        }
+        catch (IOException ex)
+        {
+            // The remote forcibly closed the connection, cancel
+            // the selection key and close the channel.
+            key.cancel();
+            try
+            {
+                channel.close();
+            }
+            catch (IOException ex1)
+            {
+                if (logger.isErrorEnabled())
+                {
+                    logger.error("", ex1);
+                }
+            }
+            if (logger.isErrorEnabled())
+            {
+                logger.error("", ex);
+            }
+            return;
+        }
+
+        if (amount == -1)
+        {
+            // Remote entity shut the socket down cleanly. Do the
+            // same from our end and cancel the channel.
+            key.cancel();
+            try
+            {
+                channel.close();
+            }
+            catch (IOException ex)
+            {
+                if (logger.isErrorEnabled())
+                {
+                    logger.error("", ex);
+                }
+            }
         }
     }
 
