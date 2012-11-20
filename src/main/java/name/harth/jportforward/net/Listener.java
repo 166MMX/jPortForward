@@ -9,35 +9,42 @@ import org.springframework.context.Lifecycle;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.nio.ByteBuffer;
-import java.nio.channels.*;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.Vector;
 
-public class Listener implements Runnable, Lifecycle, DisposableBean, InitializingBean
+public class Listener implements Runnable, Lifecycle, InitializingBean, DisposableBean
 {
+    private final Logger logger = LoggerFactory.getLogger(Listener.class);
+
     private String             address;
     private String             protocol;
     private int                port;
     private int                maxConnections;
     private List<AccessFilter> accessFilter;
-    private List<Target>       targets;
+    private Target             target;
 
     private InetSocketAddress   inetSocketAddress;
     private ServerSocketChannel channel;
     private ServerSocket        socket;
     private Selector            selector;
     private SelectionKey        selectionKey;
-    private Thread              thread;
-    private boolean             stopThread;
-    private boolean             running;
 
-    private final Logger logger = LoggerFactory.getLogger(Listener.class);
+    private List<Client> clients;
+
+    private Thread  thread;
+    private boolean stopThread;
+    private boolean running;
 
     public Listener()
     {
         thread = new Thread(this);
+        clients = new Vector<Client>();
     }
 
     @Override
@@ -69,18 +76,29 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
     {
         try
         {
+            selector = Selector.open();
+        }
+        catch (IOException ex)
+        {
+            if (logger.isErrorEnabled())
+            {
+                logger.error("", ex);
+            }
+        }
+        try
+        {
             channel = ServerSocketChannel.open();
             channel.configureBlocking(false);
 
             socket = channel.socket();
             socket.bind(inetSocketAddress);
 
-            selector = Selector.open();
             selectionKey = channel.register(selector, SelectionKey.OP_ACCEPT);
         }
         catch (IOException ex)
         {
-            if(logger.isErrorEnabled()){
+            if (logger.isErrorEnabled())
+            {
                 logger.error("", ex);
             }
         }
@@ -91,13 +109,15 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
         try
         {
             selectionKey.cancel();
-            selector.close();
             socket.close();
             channel.close();
+
+            selector.close();
         }
         catch (IOException ex)
         {
-            if(logger.isErrorEnabled()){
+            if (logger.isErrorEnabled())
+            {
                 logger.error("", ex);
             }
         }
@@ -121,9 +141,12 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
                 long timeout = 1000;
                 selector.select(timeout);
             }
-            catch (IOException e)
+            catch (IOException ex)
             {
-
+                if (logger.isErrorEnabled())
+                {
+                    logger.error("", ex);
+                }
                 break;
             }
             Set<SelectionKey> readyKeys = selector.selectedKeys();
@@ -154,23 +177,29 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
 
     private void accept(SelectionKey key)
     {
+        ServerSocketChannel listenerChannel = (ServerSocketChannel) key.channel();
+        SocketChannel remoteChannel;
+
         try
         {
-            ServerSocketChannel remoteChannel = (ServerSocketChannel) key.channel();
-            SocketChannel remoteChannel = channel.accept();
-            ssss.configureBlocking(false);
-            ssss.register(selector, SelectionKey.OP_READ);
-
-            Communicator communicator = new Communicator();
-            communicator.setRemoteChannel(ssss);
-            communicator.start();
+            remoteChannel = listenerChannel.accept();
         }
         catch (IOException ex)
         {
-            if(logger.isErrorEnabled()){
+            if (logger.isErrorEnabled())
+            {
                 logger.error("", ex);
             }
+            key.cancel();
+            return;
         }
+
+        Client client = new Client();
+        client.setTarget(target);
+        client.setRemoteChannel(remoteChannel);
+        client.start();
+
+        clients.add(client);
     }
 
     @SuppressWarnings("UnusedDeclaration")
@@ -234,15 +263,27 @@ public class Listener implements Runnable, Lifecycle, DisposableBean, Initializi
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setTargets(List<Target> targets)
+    public void setTarget(Target target)
     {
-        this.targets = targets;
+        this.target = target;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public List<Target> getTargets()
+    public Target getTarget()
     {
-        return targets;
+        return target;
+    }
+
+    @SuppressWarnings("UnusedDeclaration")
+    public List<Client> getClients()
+    {
+        return clients;
+    }
+
+    @SuppressWarnings("UnusedDeclaration")
+    private void setClients(List<Client> clients)
+    {
+        this.clients = clients;
     }
 
 }

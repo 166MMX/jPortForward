@@ -22,11 +22,7 @@
         <property name="protocol" value="tcp"/>
         <property name="port" value="56882"/>
         <property name="maxConnections" value="0"/>
-        <property name="targets">
-            <list>
-                <ref bean="target-1"/>
-            </list>
-        </property>
+        <property name="target" ref="target-1"/>
         <property name="accessFilter">
             <list>
                 <ref bean="filter-2"/>
