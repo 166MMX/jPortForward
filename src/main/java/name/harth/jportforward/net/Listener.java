@@ -117,13 +117,12 @@ public class Listener implements InitializingBean, DisposableBean
         }
 
         Client client = new Client();
+        client.setTarget(target);
+        client.setRemoteChannel(remoteChannel);
         if (!client.matchesAccessFilters(accessFilters))
         {
             return;
         }
-
-        client.setTarget(target);
-        client.setRemoteChannel(remoteChannel);
         client.start();
 
         clients.add(client);

@@ -10,19 +10,19 @@ import java.util.Map;
 public class ConverterFactory implements IStringConverterFactory
 {
 
-    private static final Map<Class<?>, Class<? extends IStringConverter<?>>> classConverters;
+    private static final Map<Class<?>, Class<? extends IStringConverter<?>>> CLASS_CONVERTERS;
 
     static
     {
-        classConverters = new HashMap<Class<?>, Class<? extends IStringConverter<?>>>();
-        classConverters.put(InetSocketAddress.class, InetSocketAddressConverter.class);
+        CLASS_CONVERTERS = new HashMap<Class<?>, Class<? extends IStringConverter<?>>>();
+        CLASS_CONVERTERS.put(InetSocketAddress.class, InetSocketAddressConverter.class);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public Class<? extends IStringConverter<?>> getConverter(Class forType)
     {
-        return classConverters.get(forType);
+        return CLASS_CONVERTERS.get(forType);
     }
 
 }

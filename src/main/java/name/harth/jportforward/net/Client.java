@@ -48,7 +48,6 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     public boolean matchesAccessFilters(List<AccessFilter> accessFilters)
     {
         boolean matches = false;
-        Socket remoteSocket = remoteChannel.socket();
         SocketAddress remoteAddress = remoteSocket.getRemoteSocketAddress();
         for (AccessFilter accessFilter : accessFilters)
         {
@@ -280,8 +279,6 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         {
             remoteChannel.configureBlocking(false);
 
-            remoteSocket = remoteChannel.socket();
-
             remoteSelectionKey = remoteChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         }
         catch (IOException ex)
@@ -374,6 +371,7 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     @SuppressWarnings("UnusedDeclaration")
     public void setRemoteChannel(SocketChannel remoteChannel)
     {
+        remoteSocket = remoteChannel.socket();
         this.remoteChannel = remoteChannel;
     }
 
