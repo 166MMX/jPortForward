@@ -48,19 +48,8 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     public boolean matchesAccessFilters(List<AccessFilter> accessFilters)
     {
         boolean matches = false;
-        SocketAddress remoteAddress;
-        try
-        {
-            remoteAddress = remoteChannel.getRemoteAddress();
-        }
-        catch (IOException ex)
-        {
-            if (logger.isErrorEnabled())
-            {
-                logger.error("", ex);
-            }
-            return matches;
-        }
+        Socket remoteSocket = remoteChannel.socket();
+        SocketAddress remoteAddress = remoteSocket.getRemoteSocketAddress();
         for (AccessFilter accessFilter : accessFilters)
         {
             if (accessFilter.match(remoteAddress))
