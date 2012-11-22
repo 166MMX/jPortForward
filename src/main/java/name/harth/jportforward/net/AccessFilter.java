@@ -1,5 +1,7 @@
 package name.harth.jportforward.net;
 
+import java.net.SocketAddress;
+
 public class AccessFilter
 {
     private String onMatch;
@@ -7,6 +9,11 @@ public class AccessFilter
     private String cidr;
     private int    port;
     private String address;
+
+    public boolean match(SocketAddress address)
+    {
+        return true;
+    }
 
     @SuppressWarnings("UnusedDeclaration")
     public void setOnMatch(String onMatch)
@@ -67,4 +74,5 @@ public class AccessFilter
     {
         return address;
     }
+
 }

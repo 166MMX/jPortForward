@@ -6,7 +6,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
-public class InetSocketAddressConverter implements IStringConverter<InetSocketAddress>
+class InetSocketAddressConverter implements IStringConverter<InetSocketAddress>
 {
 
     @Override

@@ -9,45 +9,71 @@ import org.springframework.context.Lifecycle;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public class Client implements Runnable, Lifecycle, DisposableBean, InitializingBean
 {
     private final Logger logger = LoggerFactory.getLogger(Client.class);
+    private final Thread thread = new Thread(this);
 
     private Target target;
 
     private Selector selector;
 
-    private SocketChannel     remoteChannel;
-    private SelectionKey      remoteSelectionKey;
-    private Socket            remoteSocket;
-    private ByteBuffer        remoteToTargetBuffer;
+    private SocketChannel remoteChannel;
+    private SelectionKey  remoteSelectionKey;
+    private Socket        remoteSocket;
+    private ByteBuffer    remoteToTargetBuffer;
 
-    private SocketChannel     targetChannel;
-    private SelectionKey      targetSelectionKey;
-    private Socket            targetSocket;
-    private ByteBuffer        targetToRemoteBuffer;
+    private SocketChannel targetChannel;
+    private SelectionKey  targetSelectionKey;
+    private Socket        targetSocket;
+    private ByteBuffer    targetToRemoteBuffer;
 
-    private Thread  thread;
     private boolean stopThread;
     private boolean running;
 
     public Client()
     {
-        thread = new Thread(this);
+    }
+
+    public boolean matchesAccessFilters(List<AccessFilter> accessFilters)
+    {
+        boolean matches = false;
+        SocketAddress remoteAddress;
+        try
+        {
+            remoteAddress = remoteChannel.getRemoteAddress();
+        }
+        catch (IOException ex)
+        {
+            if (logger.isErrorEnabled())
+            {
+                logger.error("", ex);
+            }
+            return matches;
+        }
+        for (AccessFilter accessFilter : accessFilters)
+        {
+            if (accessFilter.match(remoteAddress))
+            {
+                matches = true;
+            }
+        }
+        return matches;
     }
 
     @Override
     public void run()
     {
-
         running = true;
         bindSocket();
         while (true)
@@ -155,6 +181,21 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
             {
                 logger.error("", ex);
             }
+            // The remote forcibly closed the connection, cancel
+            // the selection key and close the channel.
+            key.cancel();
+            try
+            {
+                channel.close();
+            }
+            catch (IOException ex1)
+            {
+                if (logger.isErrorEnabled())
+                {
+                    logger.error("", ex1);
+                }
+            }
+            return;
         }
         if (buffer.remaining() > 0)
         {
@@ -192,6 +233,10 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         }
         catch (IOException ex)
         {
+            if (logger.isErrorEnabled())
+            {
+                logger.error("", ex);
+            }
             // The remote forcibly closed the connection, cancel
             // the selection key and close the channel.
             key.cancel();
@@ -205,10 +250,6 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                 {
                     logger.error("", ex1);
                 }
-            }
-            if (logger.isErrorEnabled())
-            {
-                logger.error("", ex);
             }
             return;
         }

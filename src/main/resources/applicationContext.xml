@@ -7,25 +7,30 @@
         <property name="maxConnections" value="0"/>
         <property name="listeners">
             <list>
-                <ref bean="listener-1"/>
-            </list>
-        </property>
-        <property name="accessFilter">
-            <list>
-                <ref bean="filter-1"/>
+                <ref local="listener-1"/>
             </list>
         </property>
     </bean>
 
-    <bean name="listener-1" class="name.harth.jportforward.net.Listener">
+    <bean name="global-access-filters" abstract="true" class="name.harth.jportforward.net.Listener">
+        <property name="accessFilters">
+            <list>
+                <ref local="filter-1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean name="listener-1" parent="global-access-filters">
         <property name="address" value="0.0.0.0"/>
         <property name="protocol" value="tcp"/>
         <property name="port" value="56882"/>
         <property name="maxConnections" value="0"/>
-        <property name="target" ref="target-1"/>
-        <property name="accessFilter">
-            <list>
-                <ref bean="filter-2"/>
+        <property name="target">
+            <ref local="target-1"/>
+        </property>
+        <property name="accessFilters">
+            <list merge="true">
+                <ref local="filter-2"/>
             </list>
         </property>
     </bean>

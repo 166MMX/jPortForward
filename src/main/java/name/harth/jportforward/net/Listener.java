@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.context.Lifecycle;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -14,11 +13,9 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
-public class Listener implements Runnable, Lifecycle, InitializingBean, DisposableBean
+public class Listener implements InitializingBean, DisposableBean
 {
     private final Logger logger = LoggerFactory.getLogger(Listener.class);
 
@@ -26,24 +23,18 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
     private String             protocol;
     private int                port;
     private int                maxConnections;
-    private List<AccessFilter> accessFilter;
+    private List<AccessFilter> accessFilters;
     private Target             target;
 
     private InetSocketAddress   inetSocketAddress;
     private ServerSocketChannel channel;
     private ServerSocket        socket;
-    private Selector            selector;
     private SelectionKey        selectionKey;
 
     private List<Client> clients;
 
-    private Thread  thread;
-    private boolean stopThread;
-    private boolean running;
-
     public Listener()
     {
-        thread = new Thread(this);
         clients = new ArrayList<Client>();
     }
 
@@ -54,37 +45,13 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
     }
 
     @Override
-    public void start()
+    public void destroy() throws Exception
     {
-        stopThread = false;
-        thread.start();
+
     }
 
-    @Override
-    public boolean isRunning()
+    public void bindSocket(Selector selector)
     {
-        return running;
-    }
-
-    @Override
-    public void stop()
-    {
-        stopThread = true;
-    }
-
-    private void bindSocket()
-    {
-        try
-        {
-            selector = Selector.open();
-        }
-        catch (IOException ex)
-        {
-            if (logger.isErrorEnabled())
-            {
-                logger.error("", ex);
-            }
-        }
         try
         {
             channel = ServerSocketChannel.open();
@@ -93,7 +60,7 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
             socket = channel.socket();
             socket.bind(inetSocketAddress);
 
-            selectionKey = channel.register(selector, SelectionKey.OP_ACCEPT);
+            selectionKey = channel.register(selector, SelectionKey.OP_ACCEPT, this);
         }
         catch (IOException ex)
         {
@@ -104,15 +71,13 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
         }
     }
 
-    private void unbindSocket()
+    public void unbindSocket()
     {
         try
         {
             selectionKey.cancel();
             socket.close();
             channel.close();
-
-            selector.close();
         }
         catch (IOException ex)
         {
@@ -123,60 +88,17 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
         }
     }
 
-    @Override
-    public void destroy() throws Exception
+    public void accept(SelectionKey key)
     {
-
-    }
-
-    @Override
-    public void run()
-    {
-        running = true;
-        bindSocket();
-        while (true)
+        if (clients.size() >= maxConnections)
         {
-            try
+            if (logger.isErrorEnabled())
             {
-                long timeout = 1000;
-                selector.select(timeout);
+                logger.error("Reached maximum connections for this listener");
             }
-            catch (IOException ex)
-            {
-                if (logger.isErrorEnabled())
-                {
-                    logger.error("", ex);
-                }
-                break;
-            }
-            Set<SelectionKey> readyKeys = selector.selectedKeys();
-            Iterator<SelectionKey> iterator = readyKeys.iterator();
-            while (iterator.hasNext())
-            {
-                SelectionKey key = iterator.next();
-                iterator.remove();
-
-                if (!key.isValid())
-                {
-                    continue;
-                }
-
-                if (key.isAcceptable())
-                {
-                    accept(key);
-                }
-            }
-            if (stopThread)
-            {
-                break;
-            }
+            return;
         }
-        unbindSocket();
-        running = false;
-    }
 
-    private void accept(SelectionKey key)
-    {
         ServerSocketChannel listenerChannel = (ServerSocketChannel) key.channel();
         SocketChannel remoteChannel;
 
@@ -195,6 +117,11 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
         }
 
         Client client = new Client();
+        if (!client.matchesAccessFilters(accessFilters))
+        {
+            return;
+        }
+
         client.setTarget(target);
         client.setRemoteChannel(remoteChannel);
         client.start();
@@ -227,15 +154,15 @@ public class Listener implements Runnable, Lifecycle, InitializingBean, Disposab
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public void setAccessFilter(List<AccessFilter> accessFilter)
+    public void setAccessFilters(List<AccessFilter> accessFilters)
     {
-        this.accessFilter = accessFilter;
+        this.accessFilters = accessFilters;
     }
 
     @SuppressWarnings("UnusedDeclaration")
-    public List<AccessFilter> getAccessFilter()
+    public List<AccessFilter> getAccessFilters()
     {
-        return accessFilter;
+        return accessFilters;
     }
 
     @SuppressWarnings("UnusedDeclaration")

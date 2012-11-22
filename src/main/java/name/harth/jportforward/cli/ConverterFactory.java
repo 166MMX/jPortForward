@@ -10,7 +10,7 @@ import java.util.Map;
 public class ConverterFactory implements IStringConverterFactory
 {
 
-    private static Map<Class<?>, Class<? extends IStringConverter<?>>> classConverters;
+    private static final Map<Class<?>, Class<? extends IStringConverter<?>>> classConverters;
 
     static
     {
