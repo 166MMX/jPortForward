@@ -12,17 +12,20 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.List;
 import java.util.Set;
 
 public class Client implements Runnable, Lifecycle, DisposableBean, InitializingBean
 {
     private final Logger logger = LoggerFactory.getLogger(Client.class);
-    private final Thread thread = new Thread(this);
+    private final Thread thread = new Thread(this, "Client");
 
     private Target target;
 
@@ -39,7 +42,6 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     private ByteBuffer    targetToRemoteBuffer;
 
     private boolean stopThread;
-    private boolean running;
 
     public Client()
     {
@@ -59,17 +61,35 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         return matches;
     }
 
+    private void allocateBuffers(int bufferSize)
+    {
+        if (logger.isInfoEnabled())
+        {
+            logger.info("allocateBuffers");
+        }
+        if (null == targetToRemoteBuffer)
+        {
+            targetToRemoteBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
+            remoteToTargetBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
+        }
+    }
+
     @Override
     public void run()
     {
-        running = true;
+        allocateBuffers(1 * 1024 * 1024); // 1 Megabyte
         bindSocket();
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Client started");
+        }
+        int timeout = 250;
+        int updatedKeys;
         while (true)
         {
             try
             {
-                long timeout = 1000;
-                selector.select(timeout);
+                updatedKeys = selector.select();
             }
             catch (IOException ex)
             {
@@ -79,18 +99,17 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                 }
                 break;
             }
-            Set<SelectionKey> readyKeys = selector.selectedKeys();
-            Iterator<SelectionKey> iterator = readyKeys.iterator();
-            while (iterator.hasNext())
+            if (0 == updatedKeys)
             {
-                SelectionKey key = iterator.next();
-                iterator.remove();
-
+                continue;
+            }
+            Set<SelectionKey> keys = selector.selectedKeys();
+            for (SelectionKey key : keys)
+            {
                 if (!key.isValid())
                 {
                     continue;
                 }
-
                 if (key.isConnectable())
                 {
                     this.finishConnect(key);
@@ -104,18 +123,24 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                     this.write(key);
                 }
             }
-
             if (stopThread)
             {
                 break;
             }
         }
         unbindSocket();
-        running = false;
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Client stopped");
+        }
     }
 
     private void finishConnect(SelectionKey key)
     {
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("finishConnect");
+        }
         SocketChannel socketChannel = (SocketChannel) key.channel();
 
         try
@@ -132,28 +157,41 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
             return;
         }
 
-        key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-
-        int bufferSize = 1 * 1024 * 1024; // 1 Megabyte
-        targetToRemoteBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
-        remoteToTargetBuffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
+        key.interestOps((key.interestOps() ^ SelectionKey.OP_CONNECT) | SelectionKey.OP_READ);
     }
 
     private void write(SelectionKey key)
     {
+        SelectionKey oppositeKey;
         SocketChannel channel = (SocketChannel) key.channel();
         if (channel == remoteChannel)
         {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("write from targetToRemoteBuffer");
+            }
             writeFromBuffer(channel, key, targetToRemoteBuffer);
+            oppositeKey = remoteSelectionKey;
         }
         else if (channel == targetChannel)
         {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("write from remoteToTargetBuffer");
+            }
             writeFromBuffer(channel, key, remoteToTargetBuffer);
+            oppositeKey = targetSelectionKey;
         }
-        if (logger.isErrorEnabled())
+        else
         {
-            logger.error("This should not have happened");
+            if (logger.isErrorEnabled())
+            {
+                logger.error("This should not have happened");
+            }
+            return;
         }
+        oppositeKey.interestOps(oppositeKey.interestOps() ^ SelectionKey.OP_WRITE);
+        selector.wakeup();
     }
 
     private void writeFromBuffer(SocketChannel channel, SelectionKey key, ByteBuffer buffer)
@@ -198,18 +236,35 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     private void read(SelectionKey key)
     {
         SocketChannel channel = (SocketChannel) key.channel();
+        SelectionKey oppositeKey;
         if (channel == remoteChannel)
         {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("read from remoteToTargetBuffer");
+            }
             readIntoBuffer(channel, key, remoteToTargetBuffer);
+            oppositeKey = targetSelectionKey;
         }
         else if (channel == targetChannel)
         {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("read from targetToRemoteBuffer");
+            }
             readIntoBuffer(channel, key, targetToRemoteBuffer);
+            oppositeKey = remoteSelectionKey;
         }
-        if (logger.isErrorEnabled())
+        else
         {
-            logger.error("This should not have happened");
+            if (logger.isErrorEnabled())
+            {
+                logger.error("This should not have happened");
+            }
+            return;
         }
+        oppositeKey.interestOps(oppositeKey.interestOps() | SelectionKey.OP_WRITE);
+        selector.wakeup();
     }
 
     private void readIntoBuffer(SocketChannel channel, SelectionKey key, ByteBuffer buffer)
@@ -261,8 +316,42 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         }
     }
 
+    private void debugByteBuffer (ByteBuffer buffer)
+    {
+        ByteBuffer dupe = buffer.duplicate();
+        Charset charset = Charset.forName("UTF-8");
+        CharsetDecoder decoder = charset.newDecoder();
+        dupe.flip();
+        CharBuffer charBuffer = null;
+        try
+        {
+            charBuffer = decoder.decode(dupe);
+        }
+        catch (CharacterCodingException ex)
+        {
+            if (logger.isErrorEnabled())
+            {
+                logger.error("", ex);
+            }
+        }
+        dupe.clear();
+        String s = null;
+        if (charBuffer != null)
+        {
+            s = charBuffer.toString();
+        }
+        if (logger.isDebugEnabled())
+        {
+            logger.debug(s);
+        }
+    }
+
     private void bindSocket()
     {
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("bindSocket");
+        }
         try
         {
             selector = Selector.open();
@@ -279,7 +368,7 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         {
             remoteChannel.configureBlocking(false);
 
-            remoteSelectionKey = remoteChannel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+            remoteSelectionKey = remoteChannel.register(selector, SelectionKey.OP_READ);
         }
         catch (IOException ex)
         {
@@ -296,8 +385,9 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
             targetChannel = SocketChannel.open();
             targetChannel.configureBlocking(false);
 
+            targetChannel.connect(targetInetSocketAddress);
+
             targetSocket = targetChannel.socket();
-            targetSocket.connect(targetInetSocketAddress);
 
             targetSelectionKey = targetChannel.register(selector, SelectionKey.OP_CONNECT);
         }
@@ -312,6 +402,10 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
 
     private void unbindSocket()
     {
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("unbindSocket");
+        }
         try
         {
             targetSelectionKey.cancel();
@@ -336,6 +430,11 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     @Override
     public void destroy() throws Exception
     {
+        stop();
+        while (thread.isAlive())
+        {
+            Thread.sleep(100);
+        }
     }
 
     @Override
@@ -346,6 +445,10 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     @Override
     public void start()
     {
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Starting client");
+        }
         stopThread = false;
         thread.start();
     }
@@ -353,13 +456,17 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
     @Override
     public void stop()
     {
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Stopping client");
+        }
         stopThread = true;
     }
 
     @Override
     public boolean isRunning()
     {
-        return running;
+        return thread.isAlive();
     }
 
     @SuppressWarnings("UnusedDeclaration")

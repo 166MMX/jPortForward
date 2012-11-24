@@ -15,7 +15,7 @@ import java.util.Set;
 public class Server implements Runnable, Lifecycle, InitializingBean, DisposableBean
 {
     private final Logger logger = LoggerFactory.getLogger(Server.class);
-    private final Thread thread = new Thread(this);
+    private final Thread thread = new Thread(this, "Server");
 
     private int                maxConnections;
     private List<Listener>     listeners;
@@ -24,7 +24,6 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
     private Selector selector;
 
     private boolean stopThread;
-    private boolean running;
 
     public Server()
     {
@@ -34,7 +33,7 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
     public void destroy() throws Exception
     {
         stop();
-        while (running)
+        while (thread.isAlive())
         {
             Thread.sleep(100);
         }
@@ -48,6 +47,10 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
     @Override
     public void start()
     {
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Starting server");
+        }
         stopThread = false;
         thread.start();
     }
@@ -55,12 +58,16 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
     @Override
     public boolean isRunning()
     {
-        return running;
+        return thread.isAlive();
     }
 
     @Override
     public void stop()
     {
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Stopping server");
+        }
         stopThread = true;
     }
 
@@ -105,14 +112,18 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
     @Override
     public void run()
     {
-        running = true;
         bindSockets();
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Server started");
+        }
+        int timeout = 250;
+        int updatedKeys;
         while (true)
         {
             try
             {
-                long timeout = 1000;
-                selector.select(timeout);
+                updatedKeys = selector.select();
             }
             catch (IOException ex)
             {
@@ -122,8 +133,12 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
                 }
                 break;
             }
-            Set<SelectionKey> readyKeys = selector.selectedKeys();
-            for (SelectionKey key : readyKeys)
+            if (0 == updatedKeys)
+            {
+                continue;
+            }
+            Set<SelectionKey> keys = selector.selectedKeys();
+            for (SelectionKey key : keys)
             {
                 if (!key.isValid())
                 {
@@ -141,7 +156,10 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
             }
         }
         unbindSockets();
-        running = false;
+        if (logger.isInfoEnabled())
+        {
+            logger.info("Server stopped");
+        }
     }
 
     @SuppressWarnings("UnusedDeclaration")

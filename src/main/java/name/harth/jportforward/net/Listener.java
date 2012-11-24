@@ -90,7 +90,7 @@ public class Listener implements InitializingBean, DisposableBean
 
     public void accept(SelectionKey key)
     {
-        if (clients.size() >= maxConnections)
+        if (maxConnections > 0 && clients.size() >= maxConnections)
         {
             if (logger.isErrorEnabled())
             {
