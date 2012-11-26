@@ -117,13 +117,13 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
         {
             logger.info("Server started");
         }
-        int timeout = 250;
+        int timeout = 1000;
         int updatedKeys;
         while (true)
         {
             try
             {
-                updatedKeys = selector.select();
+                updatedKeys = selector.select(timeout);
             }
             catch (IOException ex)
             {
@@ -131,6 +131,10 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
                 {
                     logger.error("", ex);
                 }
+                break;
+            }
+            if (stopThread)
+            {
                 break;
             }
             if (0 == updatedKeys)
@@ -149,10 +153,6 @@ public class Server implements Runnable, Lifecycle, InitializingBean, Disposable
                     Listener listener = (Listener) key.attachment();
                     listener.accept(key);
                 }
-            }
-            if (stopThread)
-            {
-                break;
             }
         }
         unbindSockets();

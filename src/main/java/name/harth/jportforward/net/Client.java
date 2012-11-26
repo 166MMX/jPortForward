@@ -12,13 +12,10 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.CharBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -83,13 +80,13 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         {
             logger.info("Client started");
         }
-        int timeout = 250;
+        int timeout = 1000;
         int updatedKeys;
         while (true)
         {
             try
             {
-                updatedKeys = selector.select();
+                updatedKeys = selector.select(timeout);
             }
             catch (IOException ex)
             {
@@ -97,6 +94,10 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                 {
                     logger.error("", ex);
                 }
+                break;
+            }
+            if (stopThread)
+            {
                 break;
             }
             if (0 == updatedKeys)
@@ -122,10 +123,6 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                 {
                     this.write(key);
                 }
-            }
-            if (stopThread)
-            {
-                break;
             }
         }
         unbindSocket();
@@ -196,6 +193,16 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
 
     private void writeFromBuffer(SocketChannel channel, SelectionKey key, ByteBuffer buffer)
     {
+        {
+            String dump = hexDump(buffer);
+            if (null != dump)
+            {
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("writeFromBuffer dump \n" + dump);
+                }
+            }
+        }
         buffer.flip();
         try
         {
@@ -226,6 +233,14 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
         if (buffer.remaining() > 0)
         {
             buffer.compact();
+            String dump = hexDump(buffer);
+            if (null != dump)
+            {
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("writeFromBuffer remaining dump \n" + dump);
+                }
+            }
         }
         else
         {
@@ -313,37 +328,97 @@ public class Client implements Runnable, Lifecycle, DisposableBean, Initializing
                     logger.error("", ex);
                 }
             }
+            return;
+        }
+
+        String dump = hexDump(buffer);
+        if (null != dump)
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("readIntoBuffer dump \n" + dump);
+            }
         }
     }
 
-    private void debugByteBuffer (ByteBuffer buffer)
+    private String hexDump(ByteBuffer buffer)
     {
-        ByteBuffer dupe = buffer.duplicate();
-        Charset charset = Charset.forName("UTF-8");
-        CharsetDecoder decoder = charset.newDecoder();
-        dupe.flip();
-        CharBuffer charBuffer = null;
-        try
+        int bytesPerShort = 2;
+        int shortsPerRow = 8;
+        int bytesPerRow = shortsPerRow * 2;
+        int splitterPos = bytesPerRow / 2;
+
+        byte[] byteArray;
+        int bytes;
         {
-            charBuffer = decoder.decode(dupe);
+            ByteBuffer byteBuffer = buffer.duplicate();
+            byteBuffer.flip();
+            bytes = byteBuffer.remaining();
+            byteArray = new byte[bytes];
+            byteBuffer.get(byteArray);
         }
-        catch (CharacterCodingException ex)
+
+        if (0 == bytes)
         {
-            if (logger.isErrorEnabled())
+            return null;
+        }
+
+        // TODO Fix last row bug; if (bytes % bytesPerRow == 0)
+        int slots = bytes + bytesPerRow - (bytes % bytesPerRow);
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < slots; i++)
+        {
+            if (0 == i % bytesPerRow)
             {
-                logger.error("", ex);
+                stringBuilder.append(String.format("%07x  ", i));
             }
+            if (i < bytes)
+            {
+                stringBuilder.append(String.format("%02x", byteArray[i]));
+            }
+            else
+            {
+                stringBuilder.append("  ");
+            }
+            // Look ahead
+            i++;
+            if (0 == i % bytesPerRow)
+            {
+                String printableString;
+                {
+                    int stringLength = (i <= bytes ? bytesPerRow : bytes % bytesPerRow);
+                    int fromIndex = i - bytesPerRow;
+                    int toIndex = fromIndex + stringLength;
+                    byte[] stringByteArray = Arrays.copyOfRange(byteArray, fromIndex, toIndex);
+                    // Convert non Printable bytes
+                    for (int j = stringLength - 1; 0 <= j; j--)
+                    {
+                        if (stringByteArray[j] <= 0x1F || stringByteArray[j] == 0x7F)
+                        {
+                            stringByteArray[j] = 0x2E; // .
+                        }
+                    }
+                    printableString = new String(stringByteArray);
+                }
+                stringBuilder.append("  ");
+                stringBuilder.append(printableString);
+            }
+            else if (0 == i % splitterPos)
+            {
+                stringBuilder.append("  ");
+            }
+            else if (0 == i % bytesPerShort)
+            {
+                stringBuilder.append(" ");
+            }
+            if (0 == i % bytesPerRow)
+            {
+                stringBuilder.append(System.lineSeparator());
+            }
+            i--;
         }
-        dupe.clear();
-        String s = null;
-        if (charBuffer != null)
-        {
-            s = charBuffer.toString();
-        }
-        if (logger.isDebugEnabled())
-        {
-            logger.debug(s);
-        }
+
+        return stringBuilder.toString();
     }
 
     private void bindSocket()

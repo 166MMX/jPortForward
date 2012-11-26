@@ -51,9 +51,9 @@
     </bean>
 
     <bean name="target-1" class="name.harth.jportforward.net.Target">
-        <property name="address" value="0.0.0.0"/>
+        <property name="address" value="127.0.0.1"/>
         <property name="protocol" value="tcp"/>
-        <property name="port" value="56882"/>
+        <property name="port" value="51422"/>
     </bean>
 
 </beans>
